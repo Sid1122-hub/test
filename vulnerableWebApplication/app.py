@@ -8,8 +8,8 @@ app.secret_key = "your_secret_key"  # Required for session management
 # MySQL Database Configuration
 DB_HOST = "127.0.0.1"
 DB_USER = "root"
-DB_PASSWORD = "Siddharth1" # enter your password
-DB_NAME = "users" #enter the table name
+DB_PASSWORD = "anujna2634@2002" # enter your password
+DB_NAME = "flask_users" #enter the table name
 
 # Function to establish a MySQL connection
 def get_db_connection():
@@ -75,7 +75,7 @@ def login():
 
         try:
             # 🔴 VULNERABLE: Directly inserting user input into SQL query
-            query = f"SELECT * FROM user WHERE username = '{username}' AND password = '{password}'"
+            query = f"SELECT * FROM user WHERE username = '{username} ' AND password = '{password}'"
             print("Executing query:", query)  # Debugging
             cursor.execute(query)
             user = cursor.fetchone()
@@ -136,7 +136,7 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    app.run(debug=False, host="127.0.0.1", port=5000)
 
     #updated code
     #newbranch
