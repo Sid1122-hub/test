@@ -1,6 +1,6 @@
 import pymysql
 import socket
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"  # Required for session management
@@ -8,8 +8,8 @@ app.secret_key = "your_secret_key"  # Required for session management
 # MySQL Database Configuration
 DB_HOST = "127.0.0.1"
 DB_USER = "root"
-DB_PASSWORD = "anujna2634@2002" # enter your password
-DB_NAME = "flask_users" #enter the table name
+DB_PASSWORD = "Siddharth1"  # Enter your password
+DB_NAME = "users"  # Enter the table name
 
 # Function to establish a MySQL connection
 def get_db_connection():
@@ -56,7 +56,7 @@ def register():
 
     return render_template('register.html')
 
-# 🔴 Login Page (Vulnerable to SQL Injection)
+# 🔴 Login Page (Vulnerable to SQL Injection & HTTP Header Injection)
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -74,7 +74,7 @@ def login():
         cursor = connection.cursor()
 
         try:
-            # 🔴 VULNERABLE: Directly inserting user input into SQL query
+            # 🔴 SQL Injection Vulnerability
             query = f"SELECT * FROM user WHERE username = '{username} ' AND password = '{password}'"
             print("Executing query:", query)  # Debugging
             cursor.execute(query)
@@ -84,7 +84,13 @@ def login():
             if user:
                 session['user'] = user['username']
                 print("Login Successful. Redirecting to dashboard...")  # Debugging
-                return redirect(url_for('dashboard'))
+                
+                # 🔴 HTTP Header Injection Vulnerability
+                injected_header = request.headers.get('X-Forwarded-For', '')
+                response = Response("Redirecting to dashboard...", status=302)
+                response.headers['Location'] = f"/dashboard?session={session['user']}{injected_header}"
+                return response
+
             else:
                 flash("Invalid credentials!", "error")
                 return redirect(url_for('login'))
@@ -96,7 +102,7 @@ def login():
 
     return render_template('login.html')
 
-# 🔴 Dashboard (Fetching User Data Insecurely)
+# 🔴 Dashboard (Vulnerable to SQL Injection & HTTP Header Injection)
 @app.route('/dashboard')
 def dashboard():
     if 'user' in session:
@@ -113,7 +119,9 @@ def dashboard():
         connection.close()
 
         if user:
-            return f"""
+            # 🔴 HTTP Header Injection: Attacker can inject newlines via the 'User-Agent' header
+            injected_header = request.headers.get('User-Agent', '')
+            response_text = f"""
                 <h2>Welcome, {user['username']}!</h2>
                 <p>Email: {user['email']}</p>
                 <p>Bank Account: {user['bank_account']}</p>
@@ -121,6 +129,9 @@ def dashboard():
                 <br>
                 <a href='/logout'>Logout</a>
             """
+            response = Response(response_text, status=200)
+            response.headers['Set-Cookie'] = f"sessionID=hacked{injected_header}"
+            return response
         else:
             flash("User not found!", "error")
             return redirect(url_for('login'))
@@ -137,6 +148,3 @@ def logout():
 
 if __name__ == '__main__':
     app.run(debug=False, host="127.0.0.1", port=5000)
-
-    #updated code
-    #newbranch
