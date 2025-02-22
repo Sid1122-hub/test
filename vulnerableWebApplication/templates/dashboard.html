@@ -4,16 +4,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="dashboard-container">
-        <h2>Welcome, {{ user.username }}!</h2>
-        <p>Email: {{ user.email }}</p>
-        <p>Bank Account: {{ user.bank_account }}</p>
-        <p>Credit Card: {{ user.credit_card }}</p>
-        <a href="{{ url_for('logout') }}">Logout</a>
-    </div>
+    <h2>Welcome, {{ user['username'] }}</h2>
+
+    <h3>Your Bank Details</h3>
+    <table border="1">
+        <tr>
+            <th>Bank Account Type</th>
+            <th>Account Number</th>
+            <th>Credit Card Number</th>
+        </tr>
+        <tr>
+            <td>{{ user['bank_account1_type'] }}</td>
+            <td>{{ user['bank_account1_number'] }}</td>
+            <td>{{ user['credit_card1'] }}</td>
+        </tr>
+        <tr>
+            <td>{{ user['bank_account2_type'] }}</td>
+            <td>{{ user['bank_account2_number'] }}</td>
+            <td>{{ user['credit_card2'] }}</td>
+        </tr>
+        <tr>
+            <td>{{ user['bank_account3_type'] }}</td>
+            <td>{{ user['bank_account3_number'] }}</td>
+            <td>{{ user['credit_card3'] }}</td>
+        </tr>
+    </table>
+
+    <h3>Filter Bank Details </h3>
+    <form method="POST">
+        <label for="filter">Enter Filter Condition:</label>
+        <input type="text" name="filter" id="filter" value="{{ filter_input }}">
+        <button type="submit">Apply Filter</button>
+    </form>
+
+    {% if filter_input %}
+        <h4>Applied Filter:</h4>
+        <p>{{ filter_input }}</p>
+    {% endif %}
+
+    {% if filtered_accounts %}
+        <h3>Filtered Bank Accounts</h3>
+        <table border="1">
+            <tr>
+                <th>Bank Account Type</th>
+                <th>Account Number</th>
+                <th>Credit Card Number</th>
+            </tr>
+            {% for acc in filtered_accounts %}
+            <tr>
+                <td>{{ acc.type }}</td>
+                <td>{{ acc.number }}</td>
+                <td>{{ acc.credit_card }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% endif %}
+
+    {% if output %}
+        <h3>Filtered Bank Accounts</h3>
+        <pre>{{ output }}</pre>
+    {% endif %}
+
+    <br>
+    <a href="{{ url_for('logout') }}">Logout</a>
 </body>
 </html>
-

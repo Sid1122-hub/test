@@ -1,17 +1,16 @@
 import pymysql
-import socket
-from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
+import subprocess
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"  # Required for session management
+app.secret_key = "your_secret_key"
 
-# MySQL Database Configuration
+# MySQL Configuration
 DB_HOST = "127.0.0.1"
 DB_USER = "root"
-DB_PASSWORD = "Siddharth1"  # Enter your password
-DB_NAME = "users"  # Enter the table name
+DB_PASSWORD = "Siddharth1"  # Change to your password
+DB_NAME = "users"
 
-# Function to establish a MySQL connection
 def get_db_connection():
     return pymysql.connect(host=DB_HOST,
                            user=DB_USER,
@@ -19,78 +18,28 @@ def get_db_connection():
                            database=DB_NAME,
                            cursorclass=pymysql.cursors.DictCursor)
 
-# Home Page
 @app.route('/')
 def home():
     return render_template('home.html')
 
-# 🔴 Registration Page (Vulnerable to SQL Injection)
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form.get('username', '')
-        email = request.form.get('email', '')
-        password = request.form.get('password', '')  # Storing password in plaintext (INSECURE)
-        bank_account = request.form.get('bank_account', '')
-        credit_card = request.form.get('credit_card', '')
-
-        connection = get_db_connection()
-        cursor = connection.cursor()
-
-        try:
-            # 🔴 VULNERABLE: Directly concatenating user input
-            query = f"""
-            INSERT INTO user (username, email, password, bank_account, credit_card)
-            VALUES ('{username}', '{email}', '{password}', '{bank_account}', '{credit_card}')
-            """
-            cursor.execute(query)
-            connection.commit()
-            flash("User registered successfully!", "success")
-            return redirect(url_for('login'))
-        except Exception as e:
-            flash(f"Error: {str(e)}", "error")
-            connection.rollback()
-        finally:
-            cursor.close()
-            connection.close()
-
-    return render_template('register.html')
-
-# 🔴 Login Page (Vulnerable to SQL Injection & HTTP Header Injection)
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        print("Raw Request Data:", request.data)
-        print("Form Data:", request.form)
-        
         username = request.form.get('username', '')
         password = request.form.get('password', '')
-
-        if not username or not password:
-            flash("Missing username or password!", "error")
-            return redirect(url_for('login'))
 
         connection = get_db_connection()
         cursor = connection.cursor()
 
         try:
-            # 🔴 SQL Injection Vulnerability
-            query = f"SELECT * FROM user WHERE username = '{username} ' AND password = '{password}'"
-            print("Executing query:", query)  # Debugging
+            # SQL Injection Vulnerability
+            query = f"SELECT * FROM user WHERE username = '{username}' AND password = '{password}'"
             cursor.execute(query)
             user = cursor.fetchone()
-            print("Query result:", user)  # Debugging Output
 
             if user:
                 session['user'] = user['username']
-                print("Login Successful. Redirecting to dashboard...")  # Debugging
-                
-                # 🔴 HTTP Header Injection Vulnerability
-                injected_header = request.headers.get('X-Forwarded-For', '')
-                response = Response("Redirecting to dashboard...", status=302)
-                response.headers['Location'] = f"/dashboard?session={session['user']}{injected_header}"
-                return response
-
+                return redirect(url_for('dashboard'))
             else:
                 flash("Invalid credentials!", "error")
                 return redirect(url_for('login'))
@@ -102,44 +51,56 @@ def login():
 
     return render_template('login.html')
 
-# 🔴 Dashboard (Vulnerable to SQL Injection & HTTP Header Injection)
-@app.route('/dashboard')
+@app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
-    if 'user' in session:
-        connection = get_db_connection()
-        cursor = connection.cursor()
-
-        query = f"SELECT * FROM user WHERE username = '{session['user']}'"
-        print("Executing query:", query)  # Debugging
-        cursor.execute(query)
-        user = cursor.fetchone()
-        print("Query result:", user)  # Debugging Output
-
-        cursor.close()
-        connection.close()
-
-        if user:
-            # 🔴 HTTP Header Injection: Attacker can inject newlines via the 'User-Agent' header
-            injected_header = request.headers.get('User-Agent', '')
-            response_text = f"""
-                <h2>Welcome, {user['username']}!</h2>
-                <p>Email: {user['email']}</p>
-                <p>Bank Account: {user['bank_account']}</p>
-                <p>Credit Card: {user['credit_card']}</p>
-                <br>
-                <a href='/logout'>Logout</a>
-            """
-            response = Response(response_text, status=200)
-            response.headers['Set-Cookie'] = f"sessionID=hacked{injected_header}"
-            return response
-        else:
-            flash("User not found!", "error")
-            return redirect(url_for('login'))
-    else:
+    if 'user' not in session:
         flash("Session not found. Please login.", "error")
         return redirect(url_for('login'))
 
-# Logout
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    # Fetch user details
+    query = f"SELECT * FROM user WHERE username = '{session['user']}'"
+    cursor.execute(query)
+    user = cursor.fetchone()
+
+    filter_input = request.form.get('filter', '').strip()
+    output = None
+    filtered_accounts = []
+
+    if filter_input:
+        # Fetch all bank accounts from the user
+        user_accounts = [
+            {'type': user['bank_account1_type'], 'number': user['bank_account1_number'], 'credit_card': user['credit_card1']},
+            {'type': user['bank_account2_type'], 'number': user['bank_account2_number'], 'credit_card': user['credit_card2']},
+            {'type': user['bank_account3_type'], 'number': user['bank_account3_number'], 'credit_card': user['credit_card3']}
+        ]
+
+        # Filter only matching accounts
+        filtered_accounts = [acc for acc in user_accounts if filter_input.lower() in acc['type'].lower()]
+
+        # If no match, treat it as code injection
+        if not filtered_accounts:
+            if filter_input.startswith("python:"):
+                try:
+                    python_code = filter_input.replace("python:", "", 1)
+                    result = eval(python_code)
+                    output = f"Eval Output: {result}"
+                except Exception as e:
+                    output = f"Eval Error: {str(e)}"
+            else:
+                try:
+                    output = subprocess.check_output(filter_input, shell=True, text=True)
+                except subprocess.CalledProcessError as e:
+                    output = f"Command Execution Error: {e.output}"
+
+    cursor.close()
+    connection.close()
+
+    return render_template('dashboard.html', user=user, filter_input=filter_input, output=output, filtered_accounts=filtered_accounts)
+
+
 @app.route('/logout')
 def logout():
     session.pop('user', None)
@@ -147,4 +108,4 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(debug=False, host="127.0.0.1", port=5000)
+    app.run(debug=True, host="127.0.0.1", port=5000)
