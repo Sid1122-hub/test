@@ -22,6 +22,52 @@ def get_db_connection():
 def home():
     return render_template('home.html')
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username', '')
+        email = request.form.get('email', '')
+        password = request.form.get('password', '')
+        
+        bank_account1_type = request.form.get('bank_account1_type', '')
+        bank_account1_number = request.form.get('bank_account1_number', '')
+        credit_card1 = request.form.get('credit_card1', '')
+        
+        bank_account2_type = request.form.get('bank_account2_type', '')
+        bank_account2_number = request.form.get('bank_account2_number', '')
+        credit_card2 = request.form.get('credit_card2', '')
+        
+        bank_account3_type = request.form.get('bank_account3_type', '')
+        bank_account3_number = request.form.get('bank_account3_number', '')
+        credit_card3 = request.form.get('credit_card3', '')
+
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        
+        try:
+            query = f"""
+            INSERT INTO user (username, email, password, 
+            bank_account1_type, bank_account1_number, credit_card1, 
+            bank_account2_type, bank_account2_number, credit_card2, 
+            bank_account3_type, bank_account3_number, credit_card3)
+            VALUES ('{username}', '{email}', '{password}', 
+            '{bank_account1_type}', '{bank_account1_number}', '{credit_card1}',
+            '{bank_account2_type}', '{bank_account2_number}', '{credit_card2}',
+            '{bank_account3_type}', '{bank_account3_number}', '{credit_card3}')
+            """
+            cursor.execute(query)
+            connection.commit()
+            flash("User registered successfully!", "success")
+            return redirect(url_for('login'))
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+            connection.rollback()
+        finally:
+            cursor.close()
+            connection.close()
+
+    return render_template('register.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -99,7 +145,6 @@ def dashboard():
     connection.close()
 
     return render_template('dashboard.html', user=user, filter_input=filter_input, output=output, filtered_accounts=filtered_accounts)
-
 
 @app.route('/logout')
 def logout():
